@@ -17,7 +17,7 @@ pipeline {
         stage('Build Docker Image') {
             steps {
                 script {
-                    def dockerImage = docker.build("${IMAGE_NAME}")
+                    dockerImage = docker.build("${IMAGE_NAME}")
                 }
             }
         }
@@ -25,9 +25,15 @@ pipeline {
         stage('Push to Docker Hub') {
             steps {
                 script {
-                    docker.withRegistry('https://index.docker.io/v1/', 'dockerhub-credentials') {
-                        def dockerImage = docker.image("${IMAGE_NAME}")
-                        dockerImage.push('latest')
+                    withCredentials([usernamePassword(credentialsId: 'dockerhub-credentials',
+                                                    usernameVariable: 'DOCKER_USER',
+                                                    passwordVariable: 'DOCKER_PASS')]) {
+                        bat """
+                        docker login -u %DOCKER_USER% -p %DOCKER_PASS%
+                        docker tag ${IMAGE_NAME}:latest ${IMAGE_NAME}:latest
+                        docker push ${IMAGE_NAME}:latest
+                        docker logout
+                        """
                     }
                 }
             }
@@ -36,10 +42,10 @@ pipeline {
 
     post {
         success {
-            echo '✅ Build and Push successful!'
+            echo '✅ Build and push to Docker Hub successful!'
         }
         failure {
-            echo '❌ Build failed! Please check logs.'
+            echo '❌ Build failed! Check Docker Hub credentials or network.'
         }
     }
 }
